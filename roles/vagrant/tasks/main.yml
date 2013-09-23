@@ -1,0 +1,30 @@
+---
+- name: Set hostname to match inventory hostname
+  template:
+    src: hostname.j2
+    dest: /etc/hostname
+  register: last_result
+
+- name: Apply hostname
+  shell: hostname {{ inventory_hostname }}
+  when: last_result.changed
+
+- name: Remove postinstall.sh
+  file: dest=/home/vagrant/postinstall.sh state=absent
+
+- name: Remove all IPv4 addresses for inventory hosts on the same VirtualBox hostonly
+        network in /etc/hosts as they may have changed
+  lineinfile: state=absent
+              dest=/etc/hosts
+              regexp='(?:[0-9]{1,3}\.){3}[0-9]{1,3} .*\b{{item}}\b.*$'
+  when: hostvars[item]['ansible_ssh_host'] is defined
+  with_items: groups.all
+
+- name: Add IPv4 addresses for all inventory hosts on the same VirtualBox hostonly
+        network to /etc/hosts
+  lineinfile: state=present
+              dest=/etc/hosts
+              regexp="^{{ hostvars[item]['ansible_ssh_host']|replace('.','\.') }} {{item}}$"
+              line="{{ hostvars[item]['ansible_ssh_host'] }} {{item}}"
+  when: hostvars[item]['ansible_ssh_host'] is defined
+  with_items: groups.all

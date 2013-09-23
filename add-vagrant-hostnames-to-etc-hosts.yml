@@ -1,0 +1,46 @@
+# This playbook will add all the vagrant hosts to your local /etc/hosts file in 
+# the form of hostname.vagrant, where hostname is the name of the vagrant machine.
+#
+# This must be done in a seperate playbook from vagrant-setup.yml unfortunately.
+# See https://github.com/ansible/ansible/issues/3958 for details on why.
+---
+
+- hosts: all
+  tasks:
+   - name: Ping hosts just to gather facts on all of them
+     action: ping
+
+- hosts: all
+  tasks:
+   - add_host: name=localhost
+
+# Hackish way to find out the username of the user running ansible
+- hosts: localhost
+  gather_facts: no
+  tasks:
+   - name: whoami?
+     local_action: shell whoami
+     register: whoami
+
+- hosts: localhost
+  gather_facts: no
+  user: "{{ whoami.stdout }}"
+  sudo: yes
+  tasks:
+   - name: Add vagrant hosts to local /etc/hosts
+     local_action: lineinfile
+                   state=present
+                   dest=/etc/hosts
+                   regexp="^(?:[0-9]{1,3}\.){3}[0-9]{1,3} {{item}}\.vagrant$"
+                   line="{{ hostvars[item]['ansible_ssh_host'] }} {{item}}.vagrant"
+     when: hostvars[item]['ansible_ssh_host'] is defined
+     with_items: '{{groups.all}}'
+   - name: Add custom domains pointing to loadbalancer to /etc/hosts
+     local_action: lineinfile
+                   state=present
+                   dest=/etc/hosts
+                   regexp="^(?:[0-9]{1,3}\.){3}[0-9]{1,3} {{item}}\.vagrant$"
+                   line="{{ hostvars['lb1']['ansible_ssh_host'] }} {{item}}.vagrant"
+     with_items:
+      - skyfall
+

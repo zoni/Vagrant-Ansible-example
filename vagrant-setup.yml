@@ -1,0 +1,20 @@
+# This playbook will do some initial configuration of Vagrant
+# boxes to make them suitable for subsequent full configuration 
+# runs of the (production) playbooks.
+---
+- hosts: all
+  user: vagrant
+  sudo: yes
+  tasks:
+   - name: Install vagrant public key for root
+     authorized_key: state=present
+                     user=root
+                     key="{{ lookup('file', 'roles/vagrant/files/vagrant.pub') }}"
+   - name: Update apt cache when cache is more than 3 hours old
+     apt: cache_valid_time=10800 update_cache=yes
+
+- hosts: all
+  user: root
+  roles:
+   - vagrant
+
